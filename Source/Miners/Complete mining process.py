@@ -5,9 +5,8 @@ from tqdm import tqdm
 from Source.Util import *
 
 # changes created and closed within this time is selected by select_changes method.
-before = {'Libreoffice': '2019', 'Eclipse': '2017', 'Gerrithub': '2019'}
-after = {'Libreoffice': '2012', 'Eclipse': '2012', 'Gerrithub': '2016'}
-# after = {'Libreoffice': '2018', 'Eclipse': '2016', 'Gerrithub': '2017'}
+before = {'Libreoffice': '2023', 'Eclipse': '2023', 'Gerrithub': '2023'}
+after = {'Libreoffice': '2012', 'Eclipse': '2012', 'Gerrithub': '2012'}
 
 def main():
     # create data directories if mining for the first time
@@ -20,34 +19,42 @@ def main():
         exit(-1)
 
     miner = Miner(gerrit=gerrit, root=root, replace=False)
-    # #
-    # # # 2. Download change details
-    # parameters = Parameters(
-    #     status=Status.closed, start_index=0, end_index=-1, n_jobs=4, batch_size=100,
-    #     after='', before='2019-00-00 00:00:00.000000000',
-    #     fields=[Field.all_revisions, Field.all_files, Field.messages, Field.detailed_labels, Field.all_commits]
-    # )
     #
+    # # 2. Download change details
+    parameters = Parameters(
+        status=Status.closed, start_index=0, end_index=-1, n_jobs=4, batch_size=100,
+        after='', before='2023-00-00 00:00:00.000000000',
+        fields=[Field.all_revisions, Field.all_files, Field.messages, Field.detailed_labels, Field.all_commits]
+    )
+
     # result = miner.change_details_mine(sub_directory=change_folder, parameters=parameters, timeout=300)
     # for url, did_succeed in result:
     #     if did_succeed is False:
     #         print(f"{url} failed .")
-
+    #
     # 3. make a list of change_ids out of downloaded data
-    make_change_list()
+    # make_change_list()
 
-    # 4. make a list of accounts
-    account_list_path = os.path.join(root, project + "_account_list.csv")
-    make_account_list()
+    # 爬取评论数据
+    # change_df = joblib.load(change_list_filepath)
+    # 有评论的change的id
+    # comment_exist_change_ids = change_df[change_df['comment_num'] > 0]['change_id']
+    # miner.comments_mine(comment_exist_change_ids)
+    # parse_comments(source=comment_root, output_path=comment_list_filepath)
 
-    # 5. mine accounts
-    df = pd.read_csv(account_list_path)
-    miner.profiles_mine(df['account_id'].values)
 
-    # 6. download join dates
-    account_ids = pd.read_csv(account_list_path)["account_id"].values
-    miner.profiles_mine(sorted(account_ids))
-
+    # # 4. make a list of accounts
+    # account_list_path = os.path.join(root, project + "_account_list.csv")
+    # make_account_list()
+    #
+    # # 5. mine accounts
+    # df = pd.read_csv(account_list_path)
+    # miner.profiles_mine(df['account_id'].values)
+    #
+    # # 6. download join dates
+    # account_ids = pd.read_csv(account_list_path)["account_id"].values
+    # miner.profiles_mine(sorted(account_ids))
+    #
     # 7. extract join date
     profile_root = f"{root}/profile"
     extract_join_dates(profile_root)
@@ -55,16 +62,16 @@ def main():
     # 8. select changes
     selected_changes_path = f"{root}/{project}_selected_changes.csv"
     select_changes(selected_changes_path)
-
-    # 9. break batch change file contents into individual change file
-    broken_changes_directory = f"{root}/changes"
-    break_changes(broken_changes_directory)
-
-    # this is better to do after selecting changes
-    # 10. mine change diff using 'Mine file diff.py' file.
-
+    #
+    # # 9. break batch change file contents into individual change file
+    # broken_changes_directory = f"{root}/changes"
+    # break_changes(broken_changes_directory)
+    #
+    # # this is better to do after selecting changes
+    # # 10. mine change diff using 'Mine file diff.py' file.
+    #
     # remove changes from the selected changes list for which file diff content was not found
-    # remove_changes_without_diff(selected_changes_path)
+    remove_changes_without_diff(selected_changes_path)
 
 
 def is_profile_file(filename: str) -> bool:
@@ -101,17 +108,17 @@ def extract_join_dates(profile_root):
     change_list_df = joblib.load(change_list_filepath)
     change_list_df['created'] = pd.to_datetime(change_list_df['created'])
 
-    for index, account_id in tqdm(enumerate(accounts)):
+    for index, account_id in tqdm(enumerate(accounts), total=accounts.shape[0]):
         if dates[index] is not None:
             selected = change_list_df[change_list_df['created'] < dates[index]]
         else:
             selected = change_list_df
 
-        # for (_, _, _, _, created, _, owner, reviewers, _, _) in selected.itertuples(name=None):
-        for (_, _, _, _, created, _, _, owner, reviewers, _, _, _, _, _) in selected.itertuples(name=None):
-            if account_id == owner or account_id in reviewers:
+        # for (_, _, _, _, created, _, _, owner, reviewers, _, _, _, _, _) in selected.itertuples(name=None):
+        for row in selected.itertuples():
+            if account_id == getattr(row, 'owner') or account_id in getattr(row, 'reviewers'):
                 # print(account_id, dates[index], change_dates[change_index])
-                dates[index] = created
+                dates[index] = getattr(row, 'created')
                 break
 
     account_list['registered_on'] = dates
@@ -156,7 +163,11 @@ def make_change_list():
         "subsystems": [],
         "message_num": [],
         "revision_num": [],
+        "comment_num": [],
+        "file_num": [],
         "duration": [],
+        "added_lines": [],
+        "deleted_lines": [],
         "status": []
     }
 
@@ -179,6 +190,10 @@ def make_change_list():
                 change_details['duration'].append(day_diff(change.closed, change.created))
                 change_details['message_num'].append(len(change.messages))
                 change_details['revision_num'].append(len(change.revisions))
+                change_details['comment_num'].append(change.comment_num)
+                change_details['file_num'].append(len(change.files))
+                change_details['added_lines'].append(change.added_lines)
+                change_details['deleted_lines'].append(change.deleted_lines)
                 # break
 
     change_list_df = pd.DataFrame(change_details).sort_values(by=["change_id"])

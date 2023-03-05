@@ -1,10 +1,10 @@
-import os, csv, json, joblib
+import os, csv, json
 import pandas as pd
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from SimpleParser import Change
-from Config import *
+from Source.Config import *
 
 def main():
     miner = DiffMiner(project, replace=False, verbose=False)

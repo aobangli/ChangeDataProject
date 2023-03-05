@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from Config import *
+from Source.Config import *
 import joblib
 
 

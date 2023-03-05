@@ -275,14 +275,18 @@ class Miner:
         self.download(url, timeout, file_path)
 
     def comments_mine(self, change_ids, sub_directory: str = "comment", timeout: int = 60):
+        print(f'{len(change_ids)} comments to be downloaded')
+
         current_directory = os.path.join(self.root, sub_directory)
         if not os.path.exists(current_directory):
             os.mkdir(current_directory)
 
         for change_id in change_ids:
-            file_path = os.path.join(current_directory, f"comment_{change_id}.json")
+            file_name = f"comment_{change_id}.json"
+            file_path = os.path.join(current_directory, file_name)
             if not self.replace and os.path.exists(file_path):
-                return
+                print(f"{file_name} already exists")
+                continue
 
             url = f"{self.gerrit.value}/changes/{change_id}/comments"
             self.download(url, timeout, file_path)

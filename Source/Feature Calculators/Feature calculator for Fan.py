@@ -6,7 +6,7 @@ from datetime import timedelta
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-from Config import *
+from Source.Config import *
 
 
 account_list_df = pd.read_csv(account_list_filepath)

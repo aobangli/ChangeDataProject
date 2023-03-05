@@ -1,5 +1,7 @@
 import os, json, csv
 
+from tqdm import tqdm
+
 
 def subsystem_of(file_path):
     str_list = file_path.split('/')
@@ -116,8 +118,13 @@ class Change:
         self.status = data['status']
         self.subject = data['subject']
 
+        self.comment_num = data['total_comment_count']
+
         self.created = data['created']
         self.updated = data['updated']
+
+        self.added_lines = data['insertions']
+        self.deleted_lines = data['deletions']
 
         self.first_revision_cached = None
         self.revisions_cached = None
@@ -310,29 +317,35 @@ class Comment:
         self.author = data['author']['_account_id']
         self.patch_set = data['patch_set']
         self.id = data['id']
-        self.line = data['line']
+        if 'line' in data.keys():
+            self.type = 'Line'
+            self.line = data['line']
+        else:
+            self.type = 'File'
+            self.line = -1
 
         self.in_reply_to = ''
         if 'in_reply_to' in data.keys():
             self.in_reply_to = data['in_reply_to']
         self.updated = data['updated']
-        self.message = data['message']
+        self.message = data['message'] if 'message' in data.keys() else ''
         self.unresolved = data['unresolved']
 
 
-def parse_comments(source, destination):
-    output_file = open(os.path.join(destination, "comments.csv"), "w", newline='')
+def parse_comments(source, output_path):
+    output_file = open(output_path, "w", newline='')
     writer = csv.writer(output_file, delimiter=',', dialect='excel')
-    writer.writerow(['change_id', 'filename', 'author', 'patch_set', 'id', 'line',
+    writer.writerow(['change_id', 'filename', 'author', 'patch_set', 'id', 'comment_type', 'line',
                      'in_reply_to', 'updated', 'message', 'unresolved'])
 
-    filenames = [filename for filename in os.listdir(source)]
-    for filename in filenames:
-        change_id = filename.split('.')[0].split('_')[1]
-        comment_jsons = json.load(open(os.path.join(source, filename), "r"))
-        for name in comment_jsons.keys():
-            comment_json = comment_jsons[name]
-            comment = Comment(comment_json)
-            writer.writerow([change_id, filename, comment.author, comment.patch_set, comment.id, comment.line,
-                             comment.in_reply_to, comment.updated, comment.message, comment.unresolved])
+    comment_file_names = [filename for filename in os.listdir(source)]
+    for comment_file_name in tqdm(comment_file_names):
+        change_id = comment_file_name.split('.')[0].split('_')[1]
+        comment_jsons_per_change = json.load(open(os.path.join(source, comment_file_name), "r"))
+        for file_name in comment_jsons_per_change.keys():
+            comment_jsons_per_file = comment_jsons_per_change[file_name]
+            for comment_json in comment_jsons_per_file:
+                comment = Comment(comment_json)
+                writer.writerow([change_id, file_name, comment.author, comment.patch_set, comment.id, comment.type,
+                                 comment.line, comment.in_reply_to, comment.updated, comment.message, comment.unresolved])
     output_file.close()

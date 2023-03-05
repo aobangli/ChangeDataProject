@@ -5,7 +5,7 @@ from Source.Miners.SimpleParser import *
 import pandas as pd
 from datetime import timedelta
 import numpy as np
-from Config import *
+from Source.Config import *
 
 account_list_df = pd.read_csv(account_list_filepath)
 account_list_df['registered_on'] = pd.to_datetime(account_list_df['registered_on'])
