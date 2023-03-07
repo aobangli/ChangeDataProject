@@ -86,8 +86,7 @@ def main():
             author_features['author_subsystem_change_num'], author_features['author_subsystem_change_merge_ratio'],
             author_features['author_avg_rounds'], author_features['author_contribution_rate'],
             author_features['author_merged_change_num'], author_features['author_abandoned_changes_num'],
-            author_features['author_change_duration_min'], author_features['author_change_duration_max'],
-            author_features['author_change_duration_avg'], author_features['author_change_duration_std'],
+            author_features['author_avg_duration'],
 
             description_features['description_length'], description_features['is_documentation'],
             description_features['is_bug_fixing'], description_features['is_feature'],
@@ -96,12 +95,21 @@ def main():
             meta_features['commit_num'], meta_features['comment_num'], meta_features['comment_word_num'],
             meta_features['last_comment_mention'], meta_features['has_test_file'],
             meta_features['description_readability'],
+            meta_features['is_responded'], meta_features['first_response_duration'],
 
             project_features['project_changes_per_week'], project_features['project_merge_ratio'],
             project_features['changes_per_author'],
-            project_features['project_author_num'], project_features['project_duration_per_change'],
-            project_features['project_commits_per_change'], project_features['project_comments_per_change'],
-            project_features['project_file_num_per_change'], project_features['project_churn_per_change'],
+            project_features['project_author_num'],
+            project_features['project_duration_per_merged_change'],
+            project_features['project_commits_per_merged_change'],
+            project_features['project_comments_per_merged_change'],
+            project_features['project_file_num_per_merged_change'],
+            project_features['project_churn_per_merged_change'],
+            project_features['project_duration_per_abandoned_change'],
+            project_features['project_commits_per_abandoned_change'],
+            project_features['project_comments_per_abandoned_change'],
+            project_features['project_file_num_per_abandoned_change'],
+            project_features['project_churn_per_abandoned_change'],
             project_features['project_additions_per_week'], project_features['project_deletions_per_week'],
             project_features['workload'],
 
@@ -115,6 +123,7 @@ def main():
             file_features['num_of_directory'], file_features['subsystem_num'],
             file_features['language_num'], file_features['file_type_num'],
             file_features['segs_added'], file_features['segs_deleted'], file_features['segs_updated'],
+            file_features['modified_code_ratio'], file_features['test_churn'], file_features['src_churn'],
 
             social_features['degree_centrality'], social_features['closeness_centrality'],
             social_features['betweenness_centrality'], social_features['eigenvector_centrality'],
@@ -210,21 +219,9 @@ class FeatureCalculator:
         features['author_merged_change_num'] = authors_work[authors_work['status'] == 'MERGED'].shape[0]
         features['author_abandoned_changes_num'] = authors_work[authors_work['status'] == 'ABANDONED'].shape[0]
 
-        if authors_work.shape[0] > 0:
-            features['author_change_duration_min'] = np.min(authors_work['duration'].values)
-            features['author_change_duration_max'] = np.max(authors_work['duration'].values)
-            features['author_change_duration_avg'] = np.mean(authors_work['duration'].values)
-            features['author_change_duration_std'] = np.std(authors_work['duration'].values)
-        elif changes_until_current.shape[0] > 0:
-            features['author_change_duration_min'] = np.min(changes_until_current['duration'].values)
-            features['author_change_duration_max'] = np.max(changes_until_current['duration'].values)
-            features['author_change_duration_avg'] = np.mean(changes_until_current['duration'].values)
-            features['author_change_duration_std'] = np.std(changes_until_current['duration'].values)
-        else:
-            features['author_change_duration_min'] = default_duration
-            features['author_change_duration_max'] = default_duration
-            features['author_change_duration_avg'] = default_duration
-            features['author_change_duration_std'] = 0
+        features['author_avg_duration'] = np.mean(authors_work['duration'].values) \
+            if authors_work.shape[0] > 0 else (np.mean(changes_until_current['duration'].values)
+                                               if changes_until_current.shape[0] > 0 else default_duration)
 
         features['is_new_author'] = True if authors_work.shape[0] == 0 else False
 
@@ -254,27 +251,52 @@ class FeatureCalculator:
         # 自己实现的
         features['project_author_num'] = owner_num
 
+        finished_works_merged = finished_works[finished_works['status'] == 'MERGED']
+        finished_works_abandoned = finished_works[finished_works['status'] == 'ABANDONED']
         changes_until_current = change_list_df[(change_list_df['updated'] < self.current_date)]
-        if finished_works.shape[0] > 0:
-            features['project_duration_per_change'] = np.mean(finished_works['duration'].values)
-            features['project_commits_per_change'] = np.mean(finished_works['revision_num'].values)
-            features['project_comments_per_change'] = np.mean(finished_works['comment_num'].values)
-            features['project_file_num_per_change'] = np.mean(finished_works['file_num'].values)
-            features['project_churn_per_change'] = np.mean(
-                finished_works['added_lines'].values + finished_works['deleted_lines'].values)
-        elif changes_until_current.shape[0] > 0:
-            features['project_duration_per_change'] = np.mean(changes_until_current['duration'].values)
-            features['project_commits_per_change'] = np.mean(changes_until_current['revision_num'].values)
-            features['project_comments_per_change'] = np.mean(changes_until_current['comment_num'].values)
-            features['project_file_num_per_change'] = np.mean(changes_until_current['file_num'].values)
-            features['project_churn_per_change'] = np.mean(
-                changes_until_current['added_lines'].values + changes_until_current['deleted_lines'].values)
+        merged_changes_until_current = changes_until_current[changes_until_current['status'] == 'MERGED']
+        abandoned_changes_until_current = changes_until_current[changes_until_current['status'] == 'ABANDONED']
+        if finished_works_merged.shape[0] > 0:
+            features['project_duration_per_merged_change'] = np.mean(finished_works_merged['duration'].values)
+            features['project_commits_per_merged_change'] = np.mean(finished_works_merged['revision_num'].values)
+            features['project_comments_per_merged_change'] = np.mean(finished_works_merged['comment_num'].values)
+            features['project_file_num_per_merged_change'] = np.mean(finished_works_merged['file_num'].values)
+            features['project_churn_per_merged_change'] = np.mean(
+                finished_works_merged['added_lines'].values + finished_works_merged['deleted_lines'].values)
+        elif merged_changes_until_current.shape[0] > 0:
+            features['project_duration_per_merged_change'] = np.mean(merged_changes_until_current['duration'].values)
+            features['project_commits_per_merged_change'] = np.mean(merged_changes_until_current['revision_num'].values)
+            features['project_comments_per_merged_change'] = np.mean(merged_changes_until_current['comment_num'].values)
+            features['project_file_num_per_merged_change'] = np.mean(merged_changes_until_current['file_num'].values)
+            features['project_churn_per_merged_change'] = np.mean(
+                merged_changes_until_current['added_lines'].values + merged_changes_until_current['deleted_lines'].values)
         else:
-            features['project_duration_per_change'] = 0
-            features['project_commits_per_change'] = 0
-            features['project_comments_per_change'] = 0
-            features['project_file_num_per_change'] = 0
-            features['project_churn_per_change'] = 0
+            features['project_duration_per_merged_change'] = 0
+            features['project_commits_per_merged_change'] = 0
+            features['project_comments_per_merged_change'] = 0
+            features['project_file_num_per_merged_change'] = 0
+            features['project_churn_per_merged_change'] = 0
+
+        if finished_works_abandoned.shape[0] > 0:
+            features['project_duration_per_abandoned_change'] = np.mean(finished_works_abandoned['duration'].values)
+            features['project_commits_per_abandoned_change'] = np.mean(finished_works_abandoned['revision_num'].values)
+            features['project_comments_per_abandoned_change'] = np.mean(finished_works_abandoned['comment_num'].values)
+            features['project_file_num_per_abandoned_change'] = np.mean(finished_works_abandoned['file_num'].values)
+            features['project_churn_per_abandoned_change'] = np.mean(
+                finished_works_abandoned['added_lines'].values + finished_works_abandoned['deleted_lines'].values)
+        elif abandoned_changes_until_current.shape[0] > 0:
+            features['project_duration_per_abandoned_change'] = np.mean(abandoned_changes_until_current['duration'].values)
+            features['project_commits_per_abandoned_change'] = np.mean(abandoned_changes_until_current['revision_num'].values)
+            features['project_comments_per_abandoned_change'] = np.mean(abandoned_changes_until_current['comment_num'].values)
+            features['project_file_num_per_abandoned_change'] = np.mean(abandoned_changes_until_current['file_num'].values)
+            features['project_churn_per_abandoned_change'] = np.mean(
+                abandoned_changes_until_current['added_lines'].values + abandoned_changes_until_current['deleted_lines'].values)
+        else:
+            features['project_duration_per_abandoned_change'] = 0
+            features['project_commits_per_abandoned_change'] = 0
+            features['project_comments_per_abandoned_change'] = 0
+            features['project_file_num_per_abandoned_change'] = 0
+            features['project_churn_per_abandoned_change'] = 0
 
         week_num = max(1, day_diff(self.current_date, self.old_date) / 7.0)
         features['project_additions_per_week'] = np.sum(finished_works['added_lines']) / week_num
@@ -358,6 +380,8 @@ class FeatureCalculator:
         if current_comments_df.shape[0] == 0:
             features['comment_word_num'] = 0
             features['last_comment_mention'] = False
+            features['is_responded'] = False
+            features['first_response_duration'] = day_diff(self.change.closed, self.change.created)
         else:
             comment_word_num = 0
             current_comments_df = current_comments_df.sort_values(by=['updated'])
@@ -368,6 +392,10 @@ class FeatureCalculator:
 
             last_comment_message = comment_messages.iloc[-1]
             features['last_comment_mention'] = ('@' in last_comment_message)
+
+            features['is_responded'] = True
+            first_comment_time = current_comments_df.iloc[0]['updated']
+            features['first_response_duration'] = day_diff(first_comment_time, self.change.created)
 
         has_test = False
         files = self.change.files
@@ -380,8 +408,6 @@ class FeatureCalculator:
 
         features['description_readability'] = textstat.textstat.coleman_liau_index(self.change.subject)
 
-
-
         return features
 
     @property
@@ -389,13 +415,21 @@ class FeatureCalculator:
         features, files = {}, self.change.files
 
         files_added = files_deleted = 0
-        lines_added = lines_deleted = 0
+        # lines_added = lines_deleted = 0
+        test_lines_added = test_lines_deleted = 0
+        non_test_lines_added = non_test_lines_deleted = 0
 
         directories = set()
         subsystems = set()
         for file in files:
-            lines_added += file.lines_inserted
-            lines_deleted += file.lines_deleted
+            if 'test' in file.name:
+                test_lines_added += file.lines_inserted
+                test_lines_deleted += file.lines_deleted
+            else:
+                non_test_lines_added += file.lines_inserted
+                non_test_lines_deleted += file.lines_deleted
+            # lines_added += file.lines_inserted
+            # lines_deleted += file.lines_deleted
 
             if file.status == 'D': files_deleted += 1
             if file.status == 'A': files_added += 1
@@ -405,7 +439,9 @@ class FeatureCalculator:
                 directories.update([names[-2]])
                 subsystems.update(names[0])
 
-        lines_changed = lines_added + lines_deleted
+        # lines_changed = lines_added + lines_deleted
+        features['test_churn'] = test_lines_added + test_lines_deleted
+        features['src_churn'] = non_test_lines_added + non_test_lines_deleted
 
         # features['lines_added'] = lines_added
         # features['lines_deleted'] = lines_deleted
@@ -443,6 +479,8 @@ class FeatureCalculator:
 
         features['modify_entropy'] = diff_result['modify_entropy']
 
+        features['modified_code_ratio'] = diff_result['modified_code_ratio']
+
         return features
 
     @property
@@ -476,11 +514,12 @@ class FeatureCalculator:
         diff_json = json.load(open(filepath, 'r'))
 
         segs_added = segs_deleted = segs_updated = lines_added = lines_deleted = lines_updated = modify_entropy = 0
-        total_line = 0
+        prev_total_line = modified_code_ratio = 0
 
         try:
             files = list(diff_json.values())[0].values()
             for file in files:
+                prev_total_line += file['meta_a']['lines'] if 'meta_a' in file.keys() else 0
                 for content in file['content']:
                     change_type = list(content.keys())
                     if change_type == ['a']:
@@ -494,6 +533,7 @@ class FeatureCalculator:
                         lines_added += len(content['b'])
 
             lines_changed = lines_added + lines_deleted + lines_updated
+            modified_code_ratio = float(lines_changed / prev_total_line) if prev_total_line > 0 else 1
             if lines_changed:
                 for file in files:
                     lines_changed_in_file = 0
@@ -520,7 +560,8 @@ class FeatureCalculator:
             'lines_added': lines_added,
             'lines_deleted': lines_deleted,
             'lines_updated': lines_updated,
-            'modify_entropy': modify_entropy
+            'modify_entropy': modify_entropy,
+            'modified_code_ratio': modified_code_ratio
         }
 
     @property
