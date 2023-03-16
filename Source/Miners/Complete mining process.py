@@ -27,13 +27,13 @@ def main():
         fields=[Field.all_revisions, Field.all_files, Field.messages, Field.detailed_labels, Field.all_commits]
     )
 
-    result = miner.change_details_mine(sub_directory=change_folder, parameters=parameters, timeout=300)
-    for url, did_succeed in result:
-        if did_succeed is False:
-            print(f"{url} failed .")
+    # result = miner.change_details_mine(sub_directory=change_folder, parameters=parameters, timeout=300)
+    # for url, did_succeed in result:
+    #     if did_succeed is False:
+    #         print(f"{url} failed .")
 
     # 3. make a list of change_ids out of downloaded data
-    # make_change_list()
+    make_change_list()
 
     # # 爬取评论数据
     # change_df = joblib.load(change_list_filepath)

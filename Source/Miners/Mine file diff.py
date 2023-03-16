@@ -9,7 +9,7 @@ from Source.Config import *
 def main():
     miner = DiffMiner(project, replace=False, verbose=False)
     change_revision_file_ids_filename = os.path.join(f'{miner.root}/{project}_change_revision_file_ids.csv')
-    # create_change_summary(miner.root, project, change_revision_file_ids_filename)
+    create_change_summary(miner.root, project, change_revision_file_ids_filename)
 
     # uncomment this if you need to rerun for mining rest of the file diffs.
     # list_not_mined_selected_changes()
