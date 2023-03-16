@@ -5,8 +5,8 @@ from tqdm import tqdm
 from Source.Util import *
 
 # changes created and closed within this time is selected by select_changes method.
-before = {'Libreoffice': '2023', 'Eclipse': '2023', 'Gerrithub': '2023'}
-after = {'Libreoffice': '2012', 'Eclipse': '2012', 'Gerrithub': '2012'}
+before = {'Libreoffice': '2023', 'Eclipse': '2023', 'Gerrithub': '2023', 'OpenStack': '2023', 'Qt': '2023'}
+after = {'Libreoffice': '2012', 'Eclipse': '2012', 'Gerrithub': '2012', 'OpenStack': '2012', 'Qt': '2012'}
 
 def main():
     # create data directories if mining for the first time
@@ -19,30 +19,30 @@ def main():
         exit(-1)
 
     miner = Miner(gerrit=gerrit, root=root, replace=False)
-    #
-    # # 2. Download change details
+
+    # 2. Download change details
     parameters = Parameters(
         status=Status.closed, start_index=0, end_index=-1, n_jobs=4, batch_size=100,
         after='', before='2023-00-00 00:00:00.000000000',
         fields=[Field.all_revisions, Field.all_files, Field.messages, Field.detailed_labels, Field.all_commits]
     )
 
-    # result = miner.change_details_mine(sub_directory=change_folder, parameters=parameters, timeout=300)
-    # for url, did_succeed in result:
-    #     if did_succeed is False:
-    #         print(f"{url} failed .")
-    #
+    result = miner.change_details_mine(sub_directory=change_folder, parameters=parameters, timeout=300)
+    for url, did_succeed in result:
+        if did_succeed is False:
+            print(f"{url} failed .")
+
     # 3. make a list of change_ids out of downloaded data
     # make_change_list()
 
-    # 爬取评论数据
+    # # 爬取评论数据
     # change_df = joblib.load(change_list_filepath)
-    # 有评论的change的id
+    # # 有评论的change的id
     # comment_exist_change_ids = change_df[change_df['comment_num'] > 0]['change_id']
     # miner.comments_mine(comment_exist_change_ids)
     # parse_comments(source=comment_root, output_path=comment_list_filepath)
-
-
+    #
+    #
     # # 4. make a list of accounts
     # account_list_path = os.path.join(root, project + "_account_list.csv")
     # make_account_list()
@@ -55,15 +55,15 @@ def main():
     # account_ids = pd.read_csv(account_list_path)["account_id"].values
     # miner.profiles_mine(sorted(account_ids))
     #
-    # 7. extract join date
-    profile_root = f"{root}/profile"
-    extract_join_dates(profile_root)
-
-    # 8. select changes
-    selected_changes_path = f"{root}/{project}_selected_changes.csv"
-    select_changes(selected_changes_path)
+    # # 7. extract join date
+    # profile_root = f"{root}/profile"
+    # extract_join_dates(profile_root)
     #
-    # # 9. break batch change file contents into individual change file
+    # # 8. select changes
+    # selected_changes_path = f"{root}/{project}_selected_changes.csv"
+    # select_changes(selected_changes_path)
+
+    # 9. break batch change file contents into individual change file
     # broken_changes_directory = f"{root}/changes"
     # break_changes(broken_changes_directory)
     #
@@ -71,7 +71,7 @@ def main():
     # # 10. mine change diff using 'Mine file diff.py' file.
     #
     # remove changes from the selected changes list for which file diff content was not found
-    remove_changes_without_diff(selected_changes_path)
+    # remove_changes_without_diff(selected_changes_path)
 
 
 def is_profile_file(filename: str) -> bool:
@@ -263,7 +263,7 @@ def break_changes(broken_changes_directory):
     if not os.path.exists(broken_changes_directory):
         os.mkdir(broken_changes_directory)
 
-    filenames = [filename for filename in os.listdir(change_directory_path)]
+    filenames = [filename for filename in os.listdir(change_directory_path) if filename.endswith(".json")]
     for filename in tqdm(filenames):
         with open(os.path.join(change_directory_path, filename), 'r', encoding='utf-8') as input_file:
             for change_json in load_change_jsons(input_file):
