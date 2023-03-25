@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 
 import joblib
@@ -37,17 +38,22 @@ def main():
                                                                                     'rounds']
     output_file_name = f"{root}/{project}.csv"
 
-    initialize(output_file_name, file_header)
+    change_numbers = change_list_df['change_id'].values
+    if os.path.exists(output_file_name):
+        old_pd = pd.read_csv(output_file_name)
+        old_change_numbers = old_pd['change_id'].values
+        current_change_number = change_numbers[~np.in1d(change_numbers, old_change_numbers)]
+    else:
+        initialize(output_file_name, file_header)
+        current_change_number = change_numbers
+
     csv_file = open(output_file_name, "a", newline='', encoding='utf-8')
     file_writer = csv.writer(csv_file, dialect='excel')
-
-    change_numbers = change_list_df['change_id'].values
 
     # it is important to calculate in sorted order of created.
     # Change numbers are given in increasing order of creation time
     count = 0
-    # for change_number in change_numbers:
-    for change_number in tqdm(change_numbers):
+    for change_number in tqdm(current_change_number):
         # print(change_number)
 
         filename = f'{project}_{change_number}_change.json'

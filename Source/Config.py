@@ -1,6 +1,7 @@
-projects = ['Libreoffice', 'Eclipse', 'Gerrithub', 'OpenStack', 'Qt']
-project = projects[3]
-data_folder = "/Users/aobang/Documents/学习资料/毕业设计/数据集/my_data/Data"
+projects = ['Libreoffice', 'Eclipse', 'Gerrithub', 'OpenStack', 'Qt', 'Android', 'OpenDaylight']
+project = projects[5]
+# data_folder = "/Users/aobang/Documents/学习资料/毕业设计/数据集/my_data/Data"
+data_folder = "E:/毕业设计/Data"
 # data_folder = "/Volumes/Extreme SSD/毕业设计/Data"
 # data_folder = "../../Data"
 root = f"{data_folder}/{project}"
@@ -53,7 +54,7 @@ features_group = {
 }
 
 late_features = ["duration", "number_of_message", "number_of_revision",
-                    "avg_delay_between_revision", "weighted_approval_score"]
+                 "avg_delay_between_revision", "weighted_approval_score"]
 
 
 def get_initial_feature_list() -> [str]:

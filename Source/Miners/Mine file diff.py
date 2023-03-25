@@ -1,15 +1,22 @@
+import gc
 import os, csv, json
+
+from fake_useragent import UserAgent
+import joblib
 import pandas as pd
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from requests.adapters import HTTPAdapter
 from tqdm import tqdm
 from SimpleParser import Change
 from Source.Config import *
 
+
 def main():
     miner = DiffMiner(project, replace=False, verbose=False)
     change_revision_file_ids_filename = os.path.join(f'{miner.root}/{project}_change_revision_file_ids.csv')
-    create_change_summary(miner.root, project, change_revision_file_ids_filename)
+    # create_change_summary(miner.root, project, change_revision_file_ids_filename)
 
     # uncomment this if you need to rerun for mining rest of the file diffs.
     # list_not_mined_selected_changes()
@@ -87,6 +94,7 @@ class DiffMiner:
         'eclipse': "https://git.eclipse.org/r",
         'libreoffice': "https://gerrit.libreoffice.org",
         'gerrithub': "https://review.gerrithub.io",
+        'openstack': "https://review.opendev.org"
     }
 
     def __init__(self, project, replace=False, verbose=False):
@@ -112,12 +120,23 @@ class DiffMiner:
     def download_diff(self, url, change_number, revision_id, file_id):
         if self.verbose: print(self.changes[change_number]['total'], url)
 
-        response = requests.get(url, timeout=6)
+        # ua = UserAgent()
+        # headers = {
+        #     "User-Agent": ua.random,
+        #     # 'Connection': 'close'
+        # }
+        session = requests.Session()
+        session.keep_alive = False
+        session.mount('http://', HTTPAdapter(max_retries=3))
+        session.mount('https://', HTTPAdapter(max_retries=3))
+        response = session.get(url, timeout=6)
+        # response = requests.get(url, timeout=6)
         if response.status_code != 200:
             print("Response error. Status code {0}, change {1}".format(response.status_code, change_number))
             return
 
         data = response.text[4:]
+
         if data is None or len(data) == 0:
             if self.verbose: print("None or Empty : " + url)
             return
@@ -159,14 +178,19 @@ class DiffMiner:
         # change_numbers = change_numbers[:10]
         df = df[df['change_number'].isin(change_numbers)]
 
-        for change_number in tqdm(change_numbers):
-            changes[change_number] = {}
-            files = df[df['change_number'] == change_number].reset_index(drop=True)
-            changes[change_number][files.loc[0, 'revision_id']] = {}
-            changes[change_number]['total'] = files.shape[0]
+        path = f"{self.root}/files_to_download.csv"
+        if os.path.exists(path):
+            changes = joblib.load(path)
+        else:
+            for change_number in tqdm(change_numbers):
+                changes[change_number] = {}
+                files = df[df['change_number'] == change_number].reset_index(drop=True)
+                changes[change_number][files.loc[0, 'revision_id']] = {}
+                changes[change_number]['total'] = files.shape[0]
+            joblib.dump(changes, path)
 
         self.changes = changes
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        with ThreadPoolExecutor(max_workers=24) as executor:
             future_to_url = {}
             for (_, change_number, id, revision_id, file_id) in tqdm(df.itertuples(name=None)):
                 filename = f"{self.diff_root}/{self.project}_{change_number}_diff.json"
@@ -179,12 +203,17 @@ class DiffMiner:
                 future_to_url[future] = url
 
             for future in as_completed(future_to_url):
-                url = future_to_url[future]
+                # url = future_to_url[future]
+                # 删除此future防止占满内存
+                url = future_to_url.pop(future)
                 try:
                     did_succeed = future.result()
                     # print(filename + 'success!')
                 except Exception as exc:
                     print(f"{url} generated an exception: {exc}")
+
+                del future
+                gc.collect()
                 # else:
                 #     print(url + ' did succeed')
 

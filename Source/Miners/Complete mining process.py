@@ -5,8 +5,8 @@ from tqdm import tqdm
 from Source.Util import *
 
 # changes created and closed within this time is selected by select_changes method.
-before = {'Libreoffice': '2023', 'Eclipse': '2023', 'Gerrithub': '2023', 'OpenStack': '2023', 'Qt': '2023'}
-after = {'Libreoffice': '2012', 'Eclipse': '2012', 'Gerrithub': '2012', 'OpenStack': '2012', 'Qt': '2012'}
+before = {'Libreoffice': '2023', 'Eclipse': '2023', 'Gerrithub': '2023', 'OpenStack': '2023', 'Qt': '2023', 'Android': '2023'}
+after = {'Libreoffice': '2000', 'Eclipse': '2000', 'Gerrithub': '2000', 'OpenStack': '2000', 'Qt': '2012', 'Android': '2000'}
 
 def main():
     # create data directories if mining for the first time
@@ -22,18 +22,18 @@ def main():
 
     # 2. Download change details
     parameters = Parameters(
-        status=Status.closed, start_index=0, end_index=-1, n_jobs=4, batch_size=100,
-        after='', before='2023-00-00 00:00:00.000000000',
+        status=Status.closed, start_index=0, end_index=1000000, n_jobs=8, batch_size=100,
+        after='', before='2023-01-01 00:00:00.000000000',
         fields=[Field.all_revisions, Field.all_files, Field.messages, Field.detailed_labels, Field.all_commits]
     )
 
-    # result = miner.change_details_mine(sub_directory=change_folder, parameters=parameters, timeout=300)
-    # for url, did_succeed in result:
-    #     if did_succeed is False:
-    #         print(f"{url} failed .")
+    result = miner.change_details_mine(sub_directory=change_folder, parameters=parameters, timeout=60)
+    for url, did_succeed in result:
+        if did_succeed is False:
+            print(f"{url} failed .")
 
     # 3. make a list of change_ids out of downloaded data
-    make_change_list()
+    # make_change_list()
 
     # # 爬取评论数据
     # change_df = joblib.load(change_list_filepath)
@@ -41,9 +41,9 @@ def main():
     # comment_exist_change_ids = change_df[change_df['comment_num'] > 0]['change_id']
     # miner.comments_mine(comment_exist_change_ids)
     # parse_comments(source=comment_root, output_path=comment_list_filepath)
-    #
-    #
-    # # 4. make a list of accounts
+
+
+    # 4. make a list of accounts
     # account_list_path = os.path.join(root, project + "_account_list.csv")
     # make_account_list()
     #
@@ -59,11 +59,11 @@ def main():
     # profile_root = f"{root}/profile"
     # extract_join_dates(profile_root)
     #
-    # # 8. select changes
+    # 8. select changes
     # selected_changes_path = f"{root}/{project}_selected_changes.csv"
     # select_changes(selected_changes_path)
-
-    # 9. break batch change file contents into individual change file
+    #
+    # # 9. break batch change file contents into individual change file
     # broken_changes_directory = f"{root}/changes"
     # break_changes(broken_changes_directory)
     #

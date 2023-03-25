@@ -3,6 +3,9 @@ import json, os
 from concurrent.futures import as_completed, ThreadPoolExecutor
 from enum import Enum
 
+from fake_useragent import UserAgent
+from requests.adapters import HTTPAdapter
+
 
 class Gerrit(Enum):
     android = "https://android-review.googlesource.com"
@@ -16,6 +19,7 @@ class Gerrit(Enum):
     openstack = "https://review.opendev.org"
     unlegacy = "https://gerrit.unlegacy-android.org"
     qt = "https://codereview.qt-project.org"
+    opendaylight = "https://git.opendaylight.org/gerrit"
 
     def __str__(self):
         return f"{self.name}"
@@ -153,7 +157,18 @@ class Miner:
         return True
 
     def download(self, url: str, timeout: int, filename: str, is_a_change: bool = False) -> bool:
-        response = requests.get(url, timeout=timeout)
+        print(f"Request : {url}")
+        ua = UserAgent()
+        headers = {
+            "User-Agent": ua.random,
+            # 'Connection': 'close'
+        }
+        session = requests.Session()
+        session.keep_alive = False
+        session.mount('http://', HTTPAdapter(max_retries=3))
+        session.mount('https://', HTTPAdapter(max_retries=3))
+        response = session.get(url, timeout=timeout, headers=headers)
+        # response = requests.get(url, timeout=timeout)
         if response.status_code != 200:
             print("Status code {0} for {1}".format(response.status_code, url))
             return False
@@ -167,7 +182,9 @@ class Miner:
 
         data = Miner.parse(data)
         if is_a_change:
-            if "\"_more_changes\": true" not in data:
+            # if "\"_more_changes\": true" not in data:
+            if '_more_changes' not in data[-1].keys() or \
+                    ('_more_changes' in data[-1].keys() and data[-1]['_more_changes'] is False):
                 self.has_more_changes = False
                 print('No more changes left')
 
@@ -180,7 +197,7 @@ class Miner:
                 self.has_more_changes = False
             return False
 
-        # print("Dumping response of {0}".format(url))
+        print("Dumping response of {0}".format(url))
         self.dump(path=filename, data=data)
         return True
 
@@ -231,7 +248,7 @@ class Miner:
         if not os.path.isdir(current_dir):
             os.mkdir(current_dir)
 
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        with ThreadPoolExecutor(max_workers=24) as executor:
             for account_id in account_ids:
                 join_file_path = os.path.join(current_dir, f"profile_{account_id}.json")
 
@@ -281,12 +298,14 @@ class Miner:
         if not os.path.exists(current_directory):
             os.mkdir(current_directory)
 
-        for change_id in change_ids:
-            file_name = f"comment_{change_id}.json"
-            file_path = os.path.join(current_directory, file_name)
-            if not self.replace and os.path.exists(file_path):
-                print(f"{file_name} already exists")
-                continue
+        with ThreadPoolExecutor(max_workers=24) as executor:
+            for change_id in change_ids:
+                file_name = f"comment_{change_id}.json"
+                file_path = os.path.join(current_directory, file_name)
+                if not self.replace and os.path.exists(file_path):
+                    print(f"{file_name} already exists")
+                    continue
 
-            url = f"{self.gerrit.value}/changes/{change_id}/comments"
-            self.download(url, timeout, file_path)
+                url = f"{self.gerrit.value}/changes/{change_id}/comments"
+                # self.download(url, timeout, file_path)
+                executor.submit(self.download, url, timeout, file_path)

@@ -333,12 +333,12 @@ class Comment:
 
 
 def parse_comments(source, output_path):
-    output_file = open(output_path, "w", newline='')
+    output_file = open(output_path, "w", newline='', encoding='utf-8-sig')
     writer = csv.writer(output_file, delimiter=',', dialect='excel')
     writer.writerow(['change_id', 'filename', 'author', 'patch_set', 'id', 'comment_type', 'line',
                      'in_reply_to', 'updated', 'message', 'unresolved'])
 
-    comment_file_names = [filename for filename in os.listdir(source)]
+    comment_file_names = [filename for filename in os.listdir(source) if filename.endswith(".json")]
     for comment_file_name in tqdm(comment_file_names):
         change_id = comment_file_name.split('.')[0].split('_')[1]
         comment_jsons_per_change = json.load(open(os.path.join(source, comment_file_name), "r"))
